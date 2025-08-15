@@ -11,6 +11,10 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showDetectPage, setShowDetectPage] = useState(false);
+  const [babyUsername, setBabyUsername] = useState('');
+  const [babyResults, setBabyResults] = useState<string[] | null>(null);
+  const [detecting, setDetecting] = useState(false);
   const [instagramUsername, setInstagramUsername] = useState('');
   const [notificationEmail, setNotificationEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -70,6 +74,19 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
       alert('Failed to trigger manual check');
     }
   };
+  const handleDetectBabies = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setDetecting(true);
+    setBabyResults(null);
+    try {
+      const urls = await apiService.detectBabies(babyUsername.trim().replace('@', ''));
+      setBabyResults(urls);
+    } catch {
+      setBabyResults([]);
+    } finally {
+      setDetecting(false);
+    }
+  };
 
   return (
     <div className="dashboard">
@@ -79,12 +96,43 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           <button onClick={triggerManualCheck} className="test-btn">
             Trigger Check (Test)
           </button>
+          <button onClick={() => setShowDetectPage(!showDetectPage)} className="test-btn">
+            No Baby No Cry
+          </button>
           <button onClick={onLogout} className="logout-btn">
             Logout
           </button>
         </div>
       </header>
 
+      {showDetectPage ? (
+        <div className="detect-section">
+          <h2>No Baby No Cry</h2>
+          <form onSubmit={handleDetectBabies} className="detect-form">
+            <input
+              type="text"
+              placeholder="Instagram username"
+              value={babyUsername}
+              onChange={e => setBabyUsername(e.target.value)}
+              required
+            />
+            <button type="submit" disabled={detecting} className="submit-btn">
+              {detecting ? 'Detecting...' : 'Detect'}
+            </button>
+          </form>
+          {babyResults && (
+            babyResults.length > 0 ? (
+              <ul>
+                {babyResults.map(url => (
+                  <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></li>
+                ))}
+              </ul>
+            ) : (
+              <p>No baby images detected.</p>
+            )
+          )}
+        </div>
+      ) : (
       <div className="dashboard-content">
         {error && <div className="error">{error}</div>}
 
@@ -195,6 +243,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           </ul>
         </div>
       </div>
+      )}
     </div>
   );
 };

@@ -23,6 +23,7 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import authRoutes from './routes/auth';
 import trackerRoutes from './routes/trackers';
+import babyRoutes from './routes/baby';
 import { CronService } from './services/CronService';
 
 const app = express();
@@ -35,6 +36,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/trackers', trackerRoutes);
+app.use('/api/baby', babyRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

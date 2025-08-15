@@ -13,9 +13,17 @@ export class CronService {
   }
 
   start(): void {
-    // Use a faster interval in development (every minute), production defaults to hourly or as configured
+    // Check if cron is enabled via environment variable (default: enabled)
+    const cronEnabled = process.env.CRON_ENABLED === undefined
+      ? true
+      : process.env.CRON_ENABLED.toLowerCase() === 'true';
+    if (!cronEnabled) {
+      console.log('Cron job is disabled (CRON_ENABLED=false)');
+      return;
+    }
+    // Use a faster interval in development (every minute), or configured interval
     const cronInterval = process.env.NODE_ENV === 'development'
-      ? '*/1 * * * *'                // every minute for local testing
+      ? process.env.CRON_INTERVAL || '*/1 * * * *'                // every minute for local testing
       : process.env.CRON_INTERVAL || '0 * * * *'; // default: top of every hour in production
 
     console.log(`Starting cron job with interval: ${cronInterval}`);
@@ -113,25 +121,30 @@ export class CronService {
         }
       } else {
         // Count-only fallback: use profile fetched during validation
-        const newCount = validation.profile?.followingCount;
-        console.log(`Count-only tracker: stored=${tracker.currentFollowingCount}, RapidAPI followingCount=${newCount}`);
-        if (typeof newCount === 'number' && newCount !== tracker.currentFollowingCount) {
-          console.log(`Following count changed for @${tracker.instagramUsername}: ${tracker.currentFollowingCount} -> ${newCount}`);
-          try {
-            // Attempt to send count change email
-            await this.emailService.sendNewFollowerCountNotification(
-              tracker.instagramUsername,
-              tracker.currentFollowingCount,
-              newCount,
-              tracker.notificationEmail
-            );
-          } catch (emailErr) {
-            console.error(`Error sending follower count email for @${tracker.instagramUsername}:`, (emailErr as Error).message);
-          }
-          // Update count even if email fails to prevent repeat notifications
-          tracker.currentFollowingCount = newCount;
+        // Skip notification if profile is a fallback due to API errors
+        if (validation.profile?.isFallback) {
+          console.warn(`Skipping count-only notification for @${tracker.instagramUsername} due to fallback profile (API error)`);
         } else {
-          console.log(`No change detected for @${tracker.instagramUsername}`);
+          const newCount = validation.profile?.followingCount;
+          console.log(`Count-only tracker: stored=${tracker.currentFollowingCount}, RapidAPI followingCount=${newCount}`);
+          if (typeof newCount === 'number' && newCount !== tracker.currentFollowingCount) {
+            console.log(`Following count changed for @${tracker.instagramUsername}: ${tracker.currentFollowingCount} -> ${newCount}`);
+            try {
+              // Attempt to send count change email
+              await this.emailService.sendNewFollowerCountNotification(
+                tracker.instagramUsername,
+                tracker.currentFollowingCount,
+                newCount,
+                tracker.notificationEmail
+              );
+            } catch (emailErr) {
+              console.error(`Error sending follower count email for @${tracker.instagramUsername}:`, (emailErr as Error).message);
+            }
+            // Update count even if email fails to prevent repeat notifications
+            tracker.currentFollowingCount = newCount;
+          } else {
+            console.log(`No change detected for @${tracker.instagramUsername}`);
+          }
         }
       }
 

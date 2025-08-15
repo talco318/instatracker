@@ -104,6 +104,14 @@ class ApiService {
     return response.data;
   }
 
+  /**
+   * Detect baby images in the latest posts of a public Instagram profile
+   */
+  async detectBabies(username: string): Promise<string[]> {
+    const response = await axios.get(`${API_BASE_URL}/baby/${username}`);
+    return response.data.urls;
+  }
+
   isAuthenticated(): boolean {
     return !!this.token;
   }

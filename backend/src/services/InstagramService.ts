@@ -10,6 +10,8 @@ export interface InstagramProfile {
   /** Numeric Instagram user ID string */
   userId?: string;
   followingList?: string[];
+  /** true if this profile is a fallback due to API error */
+  isFallback?: boolean;
 }
 
 export class InstagramService {
@@ -86,7 +88,9 @@ export class InstagramService {
       }
       const profile = this.parseProfileShape(data, cleanUsername);
       if (profile) {
-        InstagramService.profileCache.set(cleanUsername, { profile, fetchedAt: now });
+  // Mark as real fetch
+  (profile as any).isFallback = false;
+  InstagramService.profileCache.set(cleanUsername, { profile, fetchedAt: now });
         return profile;
       }
       console.warn(`Unable to parse profile for ${cleanUsername} from RapidAPI response`);
@@ -94,8 +98,8 @@ export class InstagramService {
       console.warn('Instagram RapidAPI profile fetch failed:', error.message || error);
     }
 
-  // Fallback dummy profile
-    const fallback: InstagramProfile = { username: cleanUsername, isPrivate: false, followingCount: 0 };
+  // Fallback dummy profile due to API error
+    const fallback: InstagramProfile = { username: cleanUsername, isPrivate: false, followingCount: 0, isFallback: true };
     InstagramService.profileCache.set(cleanUsername, { profile: fallback, fetchedAt: now });
     return fallback;
   }
@@ -106,7 +110,7 @@ export class InstagramService {
   async getUserIdByUsername(username: string): Promise<string> {
     const cleanUsername = username.replace('@', '');
     const query = new URLSearchParams({ username: cleanUsername }).toString();
-    const data: any = await new Promise((resolve, reject) => {
+  const data: any = await new Promise((resolve, reject) => {
       const options = {
         method: 'GET',
         hostname: this.apiHost,
@@ -131,8 +135,27 @@ export class InstagramService {
       req.on('error', reject);
       req.end();
     });
-    const userId = data.user_id || data.data?.user_id || data.id || data.id_str;
+    // Log raw response for debugging
+    console.log(`InstagramService: /user_id_by_username response for ${cleanUsername}:`, data);
+    // If RapidAPI returned an error message (e.g., quota exceeded), propagate it
+    if (data.message) {
+      console.error(`InstagramService: error message from /user_id_by_username: ${data.message}`);
+      throw new Error(data.message);
+    }
+    // Support multiple possible fields for user ID
+  const userId = data.UserID
+      || data.user_id
+      || data.data?.user_id
+      || data.data?.id
+      || data.data?.pk
+      || data.data?.user?.pk
+      || data.graphql?.user?.id
+      || data.id
+      || data.id_str;
+    // Debug resolved userId
+    console.log(`InstagramService: resolved userId for ${cleanUsername}:`, userId);
     if (!userId) {
+      console.error(`InstagramService: failed to resolve userId for ${cleanUsername}`);
       throw new Error(`Unable to fetch user ID for ${cleanUsername}`);
     }
     return userId.toString();
@@ -182,6 +205,75 @@ export class InstagramService {
       req.on('error', reject);
       req.end();
     });
+  }
+  /**
+   * Fetch a page of media for a user
+   */
+  async getMediaByUserId(userId: string, maxId?: string): Promise<any> {
+  const params = new URLSearchParams({ user_id: userId });
+  // Use next_max_id for pagination as per RapidAPI feed endpoint
+  if (maxId) params.append('next_max_id', maxId);
+    const query = params.toString();
+    return new Promise((resolve, reject) => {
+      const options = {
+        method: 'GET',
+        hostname: this.apiHost,
+        // Use the feed endpoint to list recent media posts
+        path: `/feed?${query}`,
+        headers: {
+          'x-rapidapi-key': this.apiKey,
+          'x-rapidapi-host': this.apiHost,
+          Accept: 'application/json'
+        }
+      } as const;
+      const req = https.request(options, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(Buffer.concat(chunks).toString()));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      });
+      req.on('error', reject);
+      req.end();
+    });
+  }
+  /**
+   * Fetch all media posts by paging
+   */
+  async getAllMediaByUserId(userId: string): Promise<any[]> {
+    const allItems: any[] = [];
+    let nextId: string | undefined;
+    do {
+      const resp: any = await this.getMediaByUserId(userId, nextId);
+      // Debug raw media page response
+  console.log(`InstagramService: /feed response for ${userId}:`, resp);
+      // Check for API error message
+      if (resp.message) {
+        console.error(`InstagramService: /feed error for ${userId}: ${resp.message}`);
+        throw new Error(resp.message);
+      }
+      // Support various shapes for media list
+      let pageItems: any[] = [];
+      if (Array.isArray(resp.items)) {
+        pageItems = resp.items;
+      } else if (Array.isArray(resp.data?.items)) {
+        pageItems = resp.data.items;
+      } else if (Array.isArray(resp.media)) {
+        pageItems = resp.media;
+      } else if (Array.isArray(resp.data?.media)) {
+        pageItems = resp.data.media;
+      }
+      if (pageItems.length) {
+        allItems.push(...pageItems);
+      }
+      // Support pagination cursor in multiple fields
+      nextId = resp.next_max_id ?? resp.data?.next_max_id ?? resp.end_cursor;
+    } while (nextId && allItems.length < 12);
+    return allItems;
   }
   
   /**
