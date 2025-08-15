@@ -1,0 +1,19 @@
+{
+  "name": "instatracker-root",
+  "version": "1.0.0",
+  "description": "Root package for InstaTracker monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd instatracker && npm start",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd instatracker && npm run build",
+    "install:all": "npm install && cd backend && npm install && cd ../instatracker && npm install",
+    "test": "cd backend && npm test && cd ../instatracker && npm test"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
