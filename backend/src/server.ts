@@ -37,6 +37,8 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/trackers', trackerRoutes);
 app.use('/api/baby', babyRoutes);
+import proxyRoutes from './routes/proxy';
+app.use('/api/proxy', proxyRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
