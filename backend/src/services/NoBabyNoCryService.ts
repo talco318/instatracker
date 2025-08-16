@@ -85,18 +85,17 @@ export class NoBabyNoCryService {
       strict: true
     };
     const promptText = `Determine if the image contains a human baby/infant (<24 months). If present, return one bbox per baby with normalized coordinates (0–1). Only output JSON matching the schema.`;
-    const formatObj = {
-      name: schema.name,
-      type: 'json_schema',
-      json_schema: schema.schema
+    // Build a full response_format.json_schema payload (name + strict + schema)
+    const jsonSchemaPayload = {
+      name: schema.name || 'baby_detection',
+      strict: true,
+      schema: schema.schema
     };
-    console.log('NoBabyNoCry: using text.format:', formatObj);
+
+    console.log('NoBabyNoCry: using response_format.json_schema:', jsonSchemaPayload);
+
     const resp = await this.openai.responses.create({
       model: 'gpt-4o-mini',
-      text: {
-        format: formatObj
-      },
-      // Wrap inputs in a 'message' so the API accepts the content types
       input: [
         {
           type: 'message',
@@ -106,7 +105,11 @@ export class NoBabyNoCryService {
             { type: 'input_image', image_url: url }
           ]
         }
-      ]
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: jsonSchemaPayload
+      }
     });
 
     // Debug the full response (helpful for schema failures)
@@ -119,20 +122,21 @@ export class NoBabyNoCryService {
         parsed = JSON.parse(resp.output_text);
       } else if (Array.isArray(resp.output)) {
         for (const outItem of resp.output) {
-          if (!outItem || !Array.isArray(outItem.content)) continue;
-          for (const c of outItem.content) {
-            // json_schema content (newer SDKs may place parsed JSON here)
+          if (!outItem) continue;
+          const contentArr = Array.isArray(outItem.content) ? outItem.content : [outItem.content];
+          for (const c of contentArr) {
+            if (!c) continue;
+            // newer SDKs may include the parsed object directly under c.type === 'json_schema' or c.type === 'output_text'
             if (c.type === 'json_schema' && c.json_schema) {
               parsed = c.json_schema;
               break;
             }
-            // output_text content with JSON string
             if (c.type === 'output_text' && typeof c.text === 'string') {
               try {
                 parsed = JSON.parse(c.text);
                 break;
               } catch (e) {
-                // not JSON, ignore
+                // not JSON
               }
             }
           }
