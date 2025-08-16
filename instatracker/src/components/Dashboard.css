@@ -47,6 +47,103 @@
   margin: 0 auto;
 }
 
+.detect-section {
+  max-width: 900px;
+  margin: 2rem auto;
+  background: linear-gradient(180deg, #ffffff 0%, #f8f9ff 100%);
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(100, 116, 139, 0.12);
+  border: 1px solid rgba(99,102,241,0.06);
+}
+
+.detect-section h2 {
+  margin-top: 0;
+  color: #111827;
+}
+
+.detect-form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.detect-form input[type="text"] {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  border: 1px solid #e6edf3;
+  background: #fff;
+}
+
+.baby-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.baby-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  background: white;
+  padding: 0.6rem;
+  border-radius: 10px;
+  border: 1px solid #eef2ff;
+}
+
+.baby-thumb {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.baby-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.baby-link-url {
+  display: inline-block;
+  color: #374151;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.baby-result { 
+  margin-top: 0.25rem;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.baby-flag {
+  background: #fef3c7;
+  color: #92400e;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.no-baby {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.baby-confidence {
+  color: #6b7280;
+  margin-left: 0.25rem;
+}
+
+.baby-notes {
+  color: #4b5563;
+  font-size: 0.85rem;
+  margin-top: 0.35rem;
+}
+
 .error {
   background: #fee;
   color: #c33;
@@ -152,6 +249,26 @@
 .trackers-list {
   display: grid;
   gap: 1.5rem;
+}
+
+.tracker-card {
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+
+.tracker-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 30px rgba(2,6,23,0.08);
+}
+
+.header-actions .test-btn, .header-actions .logout-btn {
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+}
+
+.section-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .tracker-card {

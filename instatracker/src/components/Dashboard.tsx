@@ -128,18 +128,29 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           </form>
           {babyResults && (
             babyResults.length > 0 ? (
-              <ul>
-                {babyResults.map((item) => (
-                  <li key={item.url}>
-                    <a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>
-                    {item.has_baby ? (
-                      <div className="baby-flag">Detected (confidence: {item.babies?.[0]?.confidence ?? 'n/a'})</div>
-                    ) : (
-                      <div className="no-baby">No baby detected</div>
-                    )}
-                  </li>
+              <div className="baby-list">
+                {babyResults.map((item, idx) => (
+                  <div className="baby-item" key={`${item.url}-${idx}`}>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="baby-link">
+                      <img src={item.url} alt={`post-${idx}`} className="baby-thumb" />
+                    </a>
+                    <div className="baby-meta">
+                      <a href={item.url} target="_blank" rel="noopener noreferrer" className="baby-link-url">{new URL(item.url).hostname}</a>
+                      <div className="baby-result">
+                        {item.has_baby ? (
+                          <span className="baby-flag">Detected</span>
+                        ) : (
+                          <span className="no-baby">No baby</span>
+                        )}
+                        <span className="baby-confidence">{item.babies?.[0]?.confidence ? ` · ${Math.round(item.babies[0].confidence * 100)}%` : ''}</span>
+                      </div>
+                      {item.babies?.[0]?.notes && (
+                        <div className="baby-notes">{item.babies[0].notes}</div>
+                      )}
+                    </div>
+                  </div>
                 ))}
-              </ul>
+              </div>
             ) : (
               <p>No baby images detected.</p>
             )
