@@ -13,7 +13,8 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showDetectPage, setShowDetectPage] = useState(false);
   const [babyUsername, setBabyUsername] = useState('');
-  const [babyResults, setBabyResults] = useState<string[] | null>(null);
+  // babyResults will be an array of objects returned from the backend: { url, has_baby, babies }
+  const [babyResults, setBabyResults] = useState<any[] | null>(null);
   const [detecting, setDetecting] = useState(false);
   const [instagramUsername, setInstagramUsername] = useState('');
   const [notificationEmail, setNotificationEmail] = useState('');
@@ -79,8 +80,13 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
     setDetecting(true);
     setBabyResults(null);
     try {
-      const urls = await apiService.detectBabies(babyUsername.trim().replace('@', ''));
-      setBabyResults(urls);
+      const results = await apiService.detectBabies(babyUsername.trim().replace('@', ''));
+      // normalize: ensure each item is an object with a url
+      const normalized = (results || []).map((r: any) => {
+        if (typeof r === 'string') return { url: r, has_baby: false, babies: [] };
+        return r;
+      });
+      setBabyResults(normalized);
     } catch {
       setBabyResults([]);
     } finally {
@@ -123,8 +129,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
           {babyResults && (
             babyResults.length > 0 ? (
               <ul>
-                {babyResults.map(url => (
-                  <li key={url}><a href={url} target="_blank" rel="noopener noreferrer">{url}</a></li>
+                {babyResults.map((item) => (
+                  <li key={item.url}>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer">{item.url}</a>
+                    {item.has_baby ? (
+                      <div className="baby-flag">Detected (confidence: {item.babies?.[0]?.confidence ?? 'n/a'})</div>
+                    ) : (
+                      <div className="no-baby">No baby detected</div>
+                    )}
+                  </li>
                 ))}
               </ul>
             ) : (

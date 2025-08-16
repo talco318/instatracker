@@ -52,53 +52,28 @@ export class NoBabyNoCryService {
     return urls;
   }
 
-  // Analyze a single image URL using JSON schema with bounding box detection
+  // Analyze a single image URL using the Responses API with text.format.json_schema
   async analyzeImageSchema(url: string): Promise<{ has_baby: boolean; babies: Array<{ bbox: number[]; confidence: number; notes?: string }> }> {
+    // New compact schema shape (returns has_baby, confidence, reason)
     const schema = {
-      name: 'baby_detection',
-      schema: {
-        type: 'object',
-        properties: {
-          has_baby: { type: 'boolean' },
-          babies: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                bbox: {
-                  description: '[x, y, width, height] normalized 0-1',
-                  type: 'array',
-                  items: { type: 'number' },
-                  minItems: 4,
-                  maxItems: 4
-                },
-                confidence: { type: 'number', minimum: 0, maximum: 1 },
-                notes: { type: 'string' }
-              },
-              required: ['bbox', 'confidence']
-            }
-          }
-        },
-        required: ['has_baby', 'babies'],
-        additionalProperties: false
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        has_baby: { type: 'boolean' },
+        confidence: { type: 'number', minimum: 0, maximum: 1 },
+        reason: { type: 'string' }
       },
-      strict: true
-    };
-    const promptText = `Determine if the image contains a human baby/infant (<24 months). If present, return one bbox per baby with normalized coordinates (0–1). Only output JSON matching the schema.`;
-    // Build a full response_format.json_schema payload (name + strict + schema)
-    const jsonSchemaPayload = {
-      name: schema.name || 'baby_detection',
-      strict: true,
-      schema: schema.schema
+      required: ['has_baby', 'confidence', 'reason']
     };
 
-    console.log('NoBabyNoCry: using response_format.json_schema:', jsonSchemaPayload);
+    const promptText = `Is there a baby in this image? Return ONLY JSON matching the schema.`;
+
+    console.log('NoBabyNoCry: calling OpenAI.responses.create with text.format.json_schema for', url);
 
     const resp = await this.openai.responses.create({
       model: 'gpt-4o-mini',
       input: [
         {
-          type: 'message',
           role: 'user',
           content: [
             { type: 'input_text', text: promptText },
@@ -106,37 +81,39 @@ export class NoBabyNoCryService {
           ]
         }
       ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: jsonSchemaPayload
+      // per the working example: place schema under text.format
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'BabyDetection',
+          strict: true,
+          schema
+        }
       }
     });
 
-    // Debug the full response (helpful for schema failures)
-    console.log('NoBabyNoCry: OpenAI responses.create raw output:', resp);
+    console.log('NoBabyNoCry: OpenAI raw response:', resp);
 
-    // Try multiple locations for the JSON schema output
+    // Parse the textual output; newer SDKs put the final combined text at resp.output_text
     let parsed: any = {};
     try {
-      if (resp.output_text) {
+      if (resp.output_text && typeof resp.output_text === 'string' && resp.output_text.trim()) {
         parsed = JSON.parse(resp.output_text);
       } else if (Array.isArray(resp.output)) {
+        // fallback: look through output array for output_text-like content
         for (const outItem of resp.output) {
           if (!outItem) continue;
-          const contentArr = Array.isArray(outItem.content) ? outItem.content : [outItem.content];
-          for (const c of contentArr) {
-            if (!c) continue;
-            // newer SDKs may include the parsed object directly under c.type === 'json_schema' or c.type === 'output_text'
-            if (c.type === 'json_schema' && c.json_schema) {
-              parsed = c.json_schema;
-              break;
-            }
-            if (c.type === 'output_text' && typeof c.text === 'string') {
-              try {
-                parsed = JSON.parse(c.text);
-                break;
-              } catch (e) {
-                // not JSON
+          const content = outItem.content;
+          if (Array.isArray(content)) {
+            for (const c of content) {
+              if (!c) continue;
+              if (c.type === 'output_text' && typeof c.text === 'string') {
+                try {
+                  parsed = JSON.parse(c.text);
+                  break;
+                } catch (err) {
+                  // ignore
+                }
               }
             }
           }
@@ -147,7 +124,17 @@ export class NoBabyNoCryService {
       console.error('NoBabyNoCry: failed to parse OpenAI JSON output:', e, 'raw output_text:', resp.output_text);
     }
 
-    return { has_baby: !!parsed.has_baby, babies: parsed.babies || [] };
+    // Map the compact BabyDetection shape into our existing return contract.
+    const has_baby = !!parsed.has_baby;
+    const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : 0;
+    const reason = parsed.reason || '';
+
+    // We don't currently produce bounding boxes with this schema; return a placeholder bbox when a baby is detected.
+    const babies = has_baby
+      ? [ { bbox: [0, 0, 0, 0], confidence, notes: reason } ]
+      : [];
+
+    return { has_baby, babies };
   }
 
   // Main entry: returns structured baby detection per URL
