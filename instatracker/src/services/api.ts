@@ -108,9 +108,14 @@ class ApiService {
    * Detect baby images in the latest posts of a public Instagram profile
    */
   async detectBabies(username: string): Promise<string[]> {
-  const response = await axios.get(`${API_BASE_URL}/baby/${username}`);
-  // backend returns { urls: BabyDetection[] }
-  return response.data.urls;
+    const response = await axios.get(`${API_BASE_URL}/baby/${username}`);
+    // backend returns { urls: BabyDetection[] }
+    return response.data.urls;
+  }
+
+  async manualDetect(urls: string[]): Promise<any[]> {
+    const response = await axios.post(`${API_BASE_URL}/baby/manual`, { urls });
+    return response.data.urls;
   }
 
   isAuthenticated(): boolean {

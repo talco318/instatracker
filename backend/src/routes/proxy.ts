@@ -5,9 +5,15 @@ import { URL } from 'url';
 
 const router = express.Router();
 
-// Allowed hosts (Instagram CDN patterns)
-const ALLOWED_HOSTS = ['cdninstagram.com', 'instagram.com', 'scontent'];
+// Allowed host patterns (substring match) - broadened to cover common CDNs
+const ALLOWED_PATTERNS = ['cdninstagram', 'instagram.com', 'scontent', 'fbcdn', 'akamaihd', 'edgecastcdn', 'cdninstagramcdn'];
 const MAX_BYTES = 6 * 1024 * 1024; // 6 MB limit for proxied images
+
+export function isAllowedHost(hostname: string): boolean {
+  if (!hostname) return false;
+  const hn = hostname.toLowerCase();
+  return ALLOWED_PATTERNS.some(p => hn.includes(p));
+}
 
 router.get('/', async (req, res) => {
   const raw = req.query.url as string;
@@ -25,9 +31,9 @@ router.get('/', async (req, res) => {
   }
 
   const hostname = parsed.hostname;
-  const allowed = ALLOWED_HOSTS.some(h => hostname.includes(h));
-  if (!allowed) {
-    return res.status(403).json({ error: 'Host not allowed' });
+  if (!isAllowedHost(hostname)) {
+    // respond with 403 but do not return JSON (so image <img> will get a non-image body and fail)
+    return res.status(403).send('Host not allowed');
   }
 
   // Choose client
@@ -46,34 +52,29 @@ router.get('/', async (req, res) => {
     const statusCode = upstreamRes.statusCode || 200;
     const contentType = upstreamRes.headers['content-type'] || 'application/octet-stream';
 
-    // If upstream returned an error status, propagate
-    if (statusCode >= 400) {
-      res.status(statusCode).json({ error: `Upstream returned ${statusCode}` });
-      upstreamRes.destroy();
-      return;
-    }
-
-    // Protect from extremely large images
+    // Protect from extremely large images (if header present)
     const lenHeader = parseInt(upstreamRes.headers['content-length'] || '0', 10);
     if (lenHeader && lenHeader > MAX_BYTES) {
-      res.status(413).json({ error: 'Image too large' });
+      res.status(413).send('Image too large');
       upstreamRes.destroy();
       return;
     }
 
+    // Forward status and headers so browser gets correct response for <img>
+    res.status(statusCode);
     res.setHeader('Content-Type', contentType);
-    // Cache images for 6 hours
     res.setHeader('Cache-Control', 'public, max-age=21600');
 
     let bytes = 0;
     upstreamRes.on('data', (chunk: Buffer) => {
       bytes += chunk.length;
       if (bytes > MAX_BYTES) {
-        res.destroy();
+        try { res.destroy(); } catch {}
         upstreamRes.destroy();
       }
     });
 
+    // Stream upstream body directly to response (works for 200 and non-200 status codes)
     upstreamRes.pipe(res);
   });
 
