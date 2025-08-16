@@ -16,8 +16,7 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
   // babyResults will be an array of objects returned from the backend: { url, has_baby, babies }
   const [babyResults, setBabyResults] = useState<any[] | null>(null);
   const [detecting, setDetecting] = useState(false);
-  const [manualUrlsOpen, setManualUrlsOpen] = useState(false);
-  const [manualUrlsText, setManualUrlsText] = useState('');
+  // manual URL paste removed
   const [instagramUsername, setInstagramUsername] = useState('');
   const [notificationEmail, setNotificationEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -127,28 +126,9 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
             <button type="submit" disabled={detecting} className="submit-btn">
               {detecting ? 'Detecting...' : 'Detect'}
             </button>
-            <button type="button" onClick={() => setManualUrlsOpen(!manualUrlsOpen)} className="submit-btn">
-              {manualUrlsOpen ? 'Close URLs' : 'Paste Image URLs'}
-            </button>
+            {/* manual URL paste removed */}
           </form>
-          {manualUrlsOpen && (
-            <div className="manual-urls">
-              <p>Paste up to 12 direct image URLs (one per line) and click Analyze.</p>
-              <textarea value={manualUrlsText} onChange={(e) => setManualUrlsText(e.target.value)} rows={6} />
-              <div style={{ marginTop: 8 }}>
-                <button onClick={async () => {
-                  const urls = manualUrlsText.split('\n').map(s => s.trim()).filter(Boolean).slice(0,12);
-                  setDetecting(true);
-                  try {
-                    const results = await apiService.manualDetect(urls);
-                    setBabyResults(results.map((r: any) => typeof r === 'string' ? { url: r, has_baby: false, babies: [] } : r));
-                  } catch (err) {
-                    setBabyResults([]);
-                  } finally { setDetecting(false); }
-                }} className="submit-btn">Analyze URLs</button>
-              </div>
-            </div>
-          )}
+          
           {babyResults && (
             babyResults.length > 0 ? (
               <div className="baby-list">

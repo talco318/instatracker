@@ -114,8 +114,8 @@ class ApiService {
   }
 
   async manualDetect(urls: string[]): Promise<any[]> {
-    const response = await axios.post(`${API_BASE_URL}/baby/manual`, { urls });
-    return response.data.urls;
+  // removed manual detect endpoint
+  throw new Error('manualDetect removed');
   }
 
   isAuthenticated(): boolean {
