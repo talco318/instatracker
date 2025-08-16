@@ -102,6 +102,11 @@
   box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
+.baby-thumb.broken {
+  opacity: 0.85;
+  filter: grayscale(40%);
+}
+
 .baby-meta {
   flex: 1;
   min-width: 0;

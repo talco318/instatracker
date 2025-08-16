@@ -132,7 +132,32 @@ const Dashboard: React.FC<DashboardProps> = ({ onLogout }) => {
                 {babyResults.map((item, idx) => (
                   <div className="baby-item" key={`${item.url}-${idx}`}>
                     <a href={item.url} target="_blank" rel="noopener noreferrer" className="baby-link">
-                      <img src={item.url} alt={`post-${idx}`} className="baby-thumb" />
+                      {/* defensive: ensure we don't render invalid URLs directly */}
+                      {(() => {
+                        let src = item.url;
+                        try {
+                          // throws if invalid
+                          new URL(src);
+                        } catch (_) {
+                          src = '';
+                        }
+                        // inline SVG placeholder (encoded) used as onError fallback
+                        const placeholder = 'data:image/svg+xml;utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"%3E%3Crect width="100%25" height="100%25" fill="%23f3f4f6"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999" font-family="Arial,Helvetica,sans-serif" font-size="14"%3EImage not available%3C/text%3E%3C/svg%3E';
+                        return (
+                          <img
+                            src={src || placeholder}
+                            alt={`post-${idx}`}
+                            className="baby-thumb"
+                            loading="lazy"
+                            onError={(e) => {
+                              const img = e.currentTarget as HTMLImageElement;
+                              img.onerror = null;
+                              img.src = placeholder;
+                              img.classList.add('broken');
+                            }}
+                          />
+                        );
+                      })()}
                     </a>
                     <div className="baby-meta">
                       <a href={item.url} target="_blank" rel="noopener noreferrer" className="baby-link-url">{new URL(item.url).hostname}</a>
